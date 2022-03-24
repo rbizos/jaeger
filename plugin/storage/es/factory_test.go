@@ -117,6 +117,18 @@ func TestElasticsearchILMUsedWithoutReadWriteAliases(t *testing.T) {
 	assert.Nil(t, r)
 }
 
+func TestElasticsearchILMUsedWithReadCreateIndexPattern(t *testing.T) {
+	f := NewFactory()
+	mockConf := &mockClientBuilder{Configuration: escfg.Configuration{Enabled: true, CreateIndexTemplates: true, UseILM: true, UseReadWriteAliases: true}}
+	mockConf.UseILM = true
+	f.primaryConfig = mockConf
+	f.archiveConfig = mockConf
+	assert.NoError(t, f.Initialize(metrics.NullFactory, zap.NewNop()))
+	w, err := f.CreateSpanWriter()
+	require.EqualError(t, err, "--es.use-ilm must be used with --es.create-index-template=False to ensure that the template is not overriden")
+	assert.Nil(t, w)
+}
+
 func TestTagKeysAsFields(t *testing.T) {
 	tests := []struct {
 		path          string
@@ -183,17 +195,6 @@ func TestCreateTemplateError(t *testing.T) {
 	w, err := f.CreateSpanWriter()
 	assert.Nil(t, w)
 	assert.Error(t, err, "template-error")
-}
-
-func TestILMDisableTemplateCreation(t *testing.T) {
-	f := NewFactory()
-	f.primaryConfig = &mockClientBuilder{createTemplateError: errors.New("template-error"), Configuration: escfg.Configuration{Enabled: true, UseILM: false, UseReadWriteAliases: true, CreateIndexTemplates: true}}
-	f.archiveConfig = &mockClientBuilder{}
-	err := f.Initialize(metrics.NullFactory, zap.NewNop())
-	require.NoError(t, err)
-	w, err := f.CreateSpanWriter()
-	assert.Nil(t, w)
-	assert.Nil(t, err) // as the createTemplate is not called, CreateSpanWriter should not return an error
 }
 
 func TestArchiveDisabled(t *testing.T) {
